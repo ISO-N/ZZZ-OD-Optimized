@@ -137,7 +137,9 @@ class BattleAssistantInterface(AppRunInterface):
 
         # 共用设置（两种模式共享）
         self.gpu_opt = SwitchSettingCard(
-            icon=FluentIcon.GAME, title='GPU运算', content='游戏画面掉帧的话 可以不启用',
+            icon=FluentIcon.GAME,
+            title='GPU运算',
+            content='默认开启。开启后闪光识别快约 1.7 倍；若游戏画面掉帧可关闭',
         )
         top.add_widget(self.gpu_opt)
 

@@ -33,7 +33,20 @@ class ModelConfig(BasicModelConfig):
 
     @property
     def flash_classifier_gpu(self) -> bool:
-        return self.get('flash_classifier_gpu', False)
+        """闪光分类器是否用 GPU 跑。
+
+        默认 **True**（开启）。理由（真机实测，见 .dsh/performance-benchmark/realtime/r08）：
+        闪光分类器在战斗循环里每帧都要跑，CPU 下单帧 16.69ms，
+        换 DirectML 后 9.79ms（**1.71x**，单帧省 6.9ms）；而且 60 帧真实战斗画面上
+        class_idx **逐帧完全一致** —— 是拿速度换速度，不是拿准确率换速度。
+
+        不用担手机器没有可用 GPU：``onnx_model_loader`` 拿不到 CUDA/DirectML provider 时
+        会自动回退到 CPU（只打一条 warning），不会报错。
+
+        唯一代价：GPU 与游戏共用，显卡较弱时可能让**游戏本身**掉帧。
+        真遇到掉帧，把这一项设回 false 即可（界面上的「GPU运算」开关）。
+        """
+        return self.get('flash_classifier_gpu', True)
 
     @flash_classifier_gpu.setter
     def flash_classifier_gpu(self, new_value: bool) -> None:

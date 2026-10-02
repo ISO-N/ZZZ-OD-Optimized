@@ -365,7 +365,14 @@ class LostVoidContext:
         artifact_pos_list = self._build_artifact_candidates_from_name_ocr(screen, screen_name)
 
         # 识别武备分支
-        if to_choose_gear_branch:
+        # 没有藏品时，下面的循环不会赋值 closest_artifact_pos，匹配结果根本用不上，
+        # 所以直接跳过这轮模板匹配（原来无论有没有藏品都要对整屏 1080p 匹配两次）。
+        #
+        # 注意：这里**不能**把搜索范围裁到「藏品中心的右侧」。
+        # match_template 默认 only_best=True，只返回全局最高置信度的那个位置，
+        # 裁剪会改变 argmax（范围外那个更强的匹配不再参与），从而选出不同的分支。
+        # 实测（.dsh/performance-benchmark/verify/v05_crop_search.py）12 组里有 1 组决策不同。
+        if to_choose_gear_branch and artifact_pos_list:
             for branch in ['a', 'b']:
                 template_id = f'gear_branch_{branch}'
                 template = self.ctx.template_loader.get_template('lost_void', template_id)

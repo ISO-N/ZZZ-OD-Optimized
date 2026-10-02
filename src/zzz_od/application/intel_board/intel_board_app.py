@@ -1,5 +1,7 @@
 from enum import StrEnum
 
+from one_dragon.base.geometry.point import Point
+from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.base.operation.application import application_const
 from one_dragon.base.operation.operation_edge import node_from
 from one_dragon.base.operation.operation_node import operation_node
@@ -149,17 +151,40 @@ class IntelBoardApp(ZApplication):
         all_commissions.sort(key=lambda x: x[1].y1)
 
         # 模板匹配 star 标记（我的帖子）
-        stars_template = self.ctx.tm.match_template(
-            source=self.last_screenshot,
-            template_sub_dir='intel_board',
-            template_id='Star',
-            threshold=0.8,
-            only_best=False,
-        )
-        stars_list = [match_result.rect for match_result in stars_template]
+        # 只在「委托文字横向覆盖范围」内匹配：下面的过滤只判断 x 轴是否重叠
+        # （star 的 y 完全不参与），所以横向范围之外的 Star 一定是无关的。
+        # 原来对整屏 1080p 直接匹配，而且 only_best=False 时 MatchResultList.append
+        # 会做 O(n²) 的去重合并，实测 633.7ms/次；裁剪后降到几十 ms。
+        expand_pixel = 30
+        stars_list: list[Rect] = []
+        if all_commissions:
+            screen_height, screen_width = self.last_screenshot.shape[:2]
+            star_template = self.ctx.template_loader.get_template('intel_board', 'Star')
+            star_width = (
+                star_template.raw.shape[1]
+                if star_template is not None and star_template.raw is not None
+                else expand_pixel
+            )
+            min_x = max(0, min(rect.x1 for _, rect in all_commissions) - star_width - expand_pixel)
+            max_x = min(
+                screen_width,
+                max(rect.x1 + rect.width for _, rect in all_commissions) + expand_pixel,
+            )
+            if max_x > min_x:
+                search_part = cv2_utils.crop_image_only(
+                    self.last_screenshot, Rect(min_x, 0, max_x, screen_height)
+                )
+                stars_template = self.ctx.tm.match_template(
+                    source=search_part,
+                    template_sub_dir='intel_board',
+                    template_id='Star',
+                    threshold=0.8,
+                    only_best=False,
+                )
+                stars_template.add_offset(Point(min_x, 0))
+                stars_list = [match_result.rect for match_result in stars_template]
 
         # 过滤与 star 在 x 轴重叠的委托 避免点击自己发布的帖子
-        expand_pixel = 30
         valid_commissions = [
             (text, rect) for text, rect in all_commissions
             if not any(

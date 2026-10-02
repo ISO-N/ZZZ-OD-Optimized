@@ -30,7 +30,6 @@ copy "..\config\repository.yml" "%TARGET_DIR%\config\"
 xcopy /E /I /Y "..\assets\text" "%TARGET_DIR%\assets\text\"
 xcopy /E /I /Y "..\assets\ui" "%TARGET_DIR%\assets\ui\"
 copy "..\pyproject.toml" "%TARGET_DIR%\"
-copy "..\uv.toml" "%TARGET_DIR%\"
 
 rem Make zip files
 powershell -Command "Compress-Archive -Path '%TARGET_DIR%' -DestinationPath '%DIST_DIR%\ZenlessZoneZero-OneDragon.zip' -Force"

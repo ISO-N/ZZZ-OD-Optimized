@@ -1,15 +1,23 @@
 import os
+import time
 from cv2.typing import MatLike
 from typing import List, Optional
 
 from one_dragon.base.screen.template_info import TemplateInfo, is_template_existed
 from one_dragon.utils import os_utils
 
+# 模板不存在时的负缓存有效期（秒）。
+# `is_template_existed` 每次要跑 1 次目录 + 3 次文件 os.path.exists（实测每次 460µs），
+# 而调用方经常对着同一个不存在的模板反复问（画面识别里逐条模板试就是典型）。
+# 用 TTL 而不是永久缓存：开发工具新建模板后，最多等这么久就能被认到。
+MISSING_TEMPLATE_CACHE_TTL: float = 10.0
+
 
 class TemplateLoader:
 
     def __init__(self):
         self.template: dict[str, TemplateInfo] = {}
+        self._missing_until: dict[str, float] = {}  # key -> 负缓存到期时间（monotonic）
 
     def get_all_template_info_from_disk(self, need_raw: bool = True, need_config: bool = False) -> List[TemplateInfo]:
         """
@@ -68,8 +76,25 @@ class TemplateLoader:
         key = '%s:%s' % (sub_dir, template_id)
         if key in self.template:
             return self.template[key]
-        else:
-            return self.load_template(sub_dir, template_id)
+
+        now = time.monotonic()
+        missing_until = self._missing_until.get(key)
+        if missing_until is not None:
+            if now < missing_until:
+                return None
+            del self._missing_until[key]  # 过期了，重新去磁盘确认一次
+
+        template = self.load_template(sub_dir, template_id)
+        if template is None:
+            self._missing_until[key] = now + MISSING_TEMPLATE_CACHE_TTL
+        return template
+
+    def clear_missing_cache(self) -> None:
+        """清空「模板不存在」的负缓存。
+
+        开发工具新建/改名模板后调用，避免 TTL 内仍被当成不存在。
+        """
+        self._missing_until.clear()
 
     def get_template_mask(self, sub_dir: str, template_id: str) -> MatLike:
         """

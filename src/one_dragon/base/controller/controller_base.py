@@ -3,6 +3,13 @@ import time
 from cv2.typing import MatLike
 
 from one_dragon.base.geometry.point import Point
+from one_dragon.utils.log_utils import log
+
+# screenshot_history 里最多保留多少张截图。
+# 每张 1080p RGB 图约 5.93MB，上限 60 张约 356MB。
+# 这是防呆上界：max_screenshot_cnt 由调用方按「存活秒数 ÷ 截图间隔」算出来，
+# 战斗路径的间隔是 0.02s，配置成 60 秒就会算出 3000 张（约 17.8GB）。
+MAX_SCREENSHOT_HISTORY: int = 60
 
 
 class ScreenshotWithTime:
@@ -68,8 +75,17 @@ class ControllerBase:
         fix_screen = self.fill_uid_black(screen)
 
         if self.max_screenshot_cnt > 0:
+            # 防呆：把调用方算出来的张数压到上界内，避免「长存活秒数 ÷ 小截图间隔」
+            # 算出成千上万张（每张 5.93MB）把内存吃光。
+            effective_cnt = min(self.max_screenshot_cnt, MAX_SCREENSHOT_HISTORY)
+            if effective_cnt < self.max_screenshot_cnt:
+                log.warning(
+                    '截图历史张数 %d 超过上限 %d 已截断（每张约 5.93MB，请检查存活秒数/截图间隔配置）',
+                    self.max_screenshot_cnt, MAX_SCREENSHOT_HISTORY,
+                )
+
             self.screenshot_history.append(ScreenshotWithTime(fix_screen, screenshot_time))
-            while len(self.screenshot_history) > self.max_screenshot_cnt:
+            while len(self.screenshot_history) > effective_cnt:
                 self.screenshot_history.pop(0)
 
             while (len(self.screenshot_history) > 0

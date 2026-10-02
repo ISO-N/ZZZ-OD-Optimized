@@ -2,7 +2,7 @@
 name: zzz-od-dev-state-machine
 description: 绝区零一条龙 Operation 状态机开发指南，说明如何用节点、边和轮次结果编排自动化流程
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, one-dragon, operation, state-machine, development]
 ---
 

@@ -2,7 +2,7 @@
 name: zzz-od-dev-cv-method
 description: 绝区零一条龙新增 CV 流水线步骤与目标状态解读方式指南
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, one-dragon, cv, image-analysis, development]
 ---
 

@@ -18,6 +18,9 @@ concurrency:
   group: build-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: write
+
 env:
   CREATE_RELEASE: ${{ (github.event_name == 'workflow_dispatch' && inputs.create_release == true) || startsWith(github.ref, 'refs/tags/') }}
 
@@ -176,12 +179,14 @@ jobs:
     needs:
       - version
       - build
-    if: ${{ github.repository_owner == 'OneDragon-Anything' &&
+    # 代码签名是可选能力：只有仓库变量 ENABLE_SIGNING 打开时才跑。
+    # 关闭时本 job 整体 skipped，release job 会容忍 skipped 继续出包（未签名）。
+    if: ${{ vars.ENABLE_SIGNING == 'true' &&
             ((github.event_name == 'workflow_dispatch' && inputs.create_release == true) || startsWith(github.ref, 'refs/tags/'))
         }}
     env:
       SIGNED_DIR: 'signed'
-      SIGNPATH_SIGNING_POLICY_SLUG: 'release-signing'
+      SIGNPATH_SIGNING_POLICY_SLUG: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG || 'release-signing' }}
     steps:
     - name: Sign Artifact
       if: ${{ needs.build.outputs.unsigned_artifact_id != '' }}
@@ -189,7 +194,7 @@ jobs:
       with:
         api-token: '${{ secrets.SIGNPATH_API_TOKEN }}'
         organization-id: '${{ vars.SIGNPATH_ORGANIZATION_ID }}'
-        project-slug: 'ZenlessZoneZero-OneDragon'
+        project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'ZZZ-OD-Optimized' }}
         signing-policy-slug: '${{ env.SIGNPATH_SIGNING_POLICY_SLUG }}'
         github-artifact-id: "${{ needs.build.outputs.unsigned_artifact_id }}"
         wait-for-completion: true
@@ -197,6 +202,7 @@ jobs:
         output-artifact-directory: '${{ env.SIGNED_DIR }}'
 
     - name: Upload signed executables
+      if: ${{ vars.ENABLE_SIGNING == 'true' }}
       uses: actions/upload-artifact@v4
       with:
         name: signed
@@ -211,8 +217,8 @@ jobs:
       - sign
     if: ${{ always() &&
             needs.build.result == 'success' &&
-            ((github.event_name == 'workflow_dispatch' && inputs.create_release == true) || startsWith(github.ref, 'refs/tags/')) &&
-            (needs.sign.result == 'success')
+            (needs.sign.result == 'success' || needs.sign.result == 'skipped') &&
+            ((github.event_name == 'workflow_dispatch' && inputs.create_release == true) || startsWith(github.ref, 'refs/tags/'))
         }}
     steps:
     - name: Checkout code
@@ -246,11 +252,13 @@ jobs:
       run: python tools/ci/prepare_release_assets.py --release-version "$env:RELEASE_VERSION"
 
     - name: Create Release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       with:
         tag_name: ${{ needs.version.outputs.version }}
         name: "Release ${{ needs.version.outputs.version }}"
         body: |
+          > 本仓库是 [上游 ZenlessZoneZero-OneDragon](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 的**性能优化分支**，非官方发布。遇到问题请在本仓库提 Issue。
+
           ## 安装方式
 
           - `ZenlessZoneZero-OneDragon-${{ needs.version.outputs.version }}-Full-Environment.zip` 为带环境的完整包，不需要额外下载资源。
@@ -262,26 +270,15 @@ jobs:
           - `ZenlessZoneZero-OneDragon-RuntimeLauncher.zip` 为集成启动器更新包（exe + .runtime），用于已有环境的就地升级。
           - __不要下载Source Code__
 
-          安装前请查看 [安装指南](https://one-dragon.com/zzz/zh/quickstart.html)
-          若运行出错请查看 [自助排障指南](https://docs.qq.com/doc/p/7add96a4600d363b75d2df83bb2635a7c6a969b5)
-
-          已有 Mirror酱 CDK？前往 [Mirror酱](https://mirrorchyan.com/zh/projects?rid=ZZZ-OneDragon&source=zzzgh-release) 高速下载
-
-          ## 签名策略 (Code Signing Policy)
-
-          免费代码签名由 [SignPath.io](https://signpath.io/) 提供，证书由 [SignPath Foundation](https://signpath.org/) 颁发
-
-          审批人：[DoctorReid](https://github.com/DoctorReid) [ShadowLemoon](https://github.com/ShadowLemoon)
-
-          Free code signing provided by [SignPath.io](https://signpath.io/), certificate by [SignPath Foundation](https://signpath.org/)
-
-          Approvers: [DoctorReid](https://github.com/DoctorReid) [ShadowLemoon](https://github.com/ShadowLemoon)
+          本仓库所有依赖（uv / Python / 识别模型）默认从 GitHub 下载；安装前请查看 [安装说明](https://github.com/ISO-N/ZZZ-OD-Optimized#安装)。
+          发布产物由 GitHub Actions 从本仓库源码构建，构建日志见本仓库 Actions 页面。
+          未启用代码签名的版本首次运行可能出现「未知发布者」提示，属于预期现象。
 
           ## 隐私政策 (Privacy Policy)
 
-          本程序的隐私政策详见：[隐私政策](.github/PRIVACY.md)。
+          本程序默认**不采集、不上报**任何运行数据（遥测默认关闭）。详见：[隐私政策](.github/PRIVACY.md)。
 
-          See the [Privacy Policy](.github/PRIVACY.md).
+          Telemetry is **disabled by default**. See the [Privacy Policy](.github/PRIVACY.md).
 
         files: |
           ZenlessZoneZero-OneDragon-${{ needs.version.outputs.version }}-Full-Environment.zip
@@ -296,40 +293,3 @@ jobs:
         prerelease: ${{ contains(needs.version.outputs.version, '-beta.') }}
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Trigger CNB Release sync
-      if: ${{ github.repository == 'OneDragon-Anything/ZenlessZoneZero-OneDragon' }}
-      continue-on-error: true
-      shell: pwsh
-      env:
-        CNB_TOKEN: ${{ secrets.CNB_TOKEN }}
-        RELEASE_TAG: ${{ needs.version.outputs.version }}
-      run: |
-        if ([string]::IsNullOrWhiteSpace($env:CNB_TOKEN)) {
-          throw 'Missing GitHub Actions secret: CNB_TOKEN'
-        }
-
-        $headers = @{
-          Accept = 'application/vnd.cnb.api+json'
-          Authorization = "Bearer $env:CNB_TOKEN"
-        }
-        $body = @{
-          branch = 'main'
-          event = 'api_trigger_release'
-          title = "Sync GitHub Release $env:RELEASE_TAG"
-          env = @{
-            RELEASE_TAG = $env:RELEASE_TAG
-          }
-        } | ConvertTo-Json -Depth 3
-
-        $response = Invoke-RestMethod `
-          -Uri 'https://api.cnb.cool/OneDragon-Anything/ZenlessZoneZero-OneDragon/-/build/start' `
-          -Method Post `
-          -Headers $headers `
-          -ContentType 'application/json' `
-          -TimeoutSec 60 `
-          -Body $body
-        $response | ConvertTo-Json -Depth 5
-        if ($response.success -ne $true) {
-          throw "CNB build trigger failed: $($response.message)"
-        }

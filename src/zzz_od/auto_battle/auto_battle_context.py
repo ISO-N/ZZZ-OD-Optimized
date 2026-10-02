@@ -35,6 +35,10 @@ if TYPE_CHECKING:
 
 _battle_state_check_executor = ThreadPoolExecutor(thread_name_prefix='od_battle_state_check', max_workers=16)
 
+# `_op_cache` 最多保留几份已构建的自动战斗配置。
+# 每份 operator 构建约 393-459ms、常驻内存十几 MB（实测 5 份 RSS +56.8MB）。
+MAX_OP_CACHE_SIZE: int = 3
+
 
 class AutoBattleContext:
 
@@ -118,6 +122,7 @@ class AutoBattleContext:
 
         if read_from_merged and key not in self._op_cache:
             self._op_cache[key] = self.auto_op
+            self._trim_op_cache(keep=key)
 
         # 识别间隔
         self._check_chain_interval = self.auto_op.check_chain_interval
@@ -130,6 +135,25 @@ class AutoBattleContext:
         self.agent_context.init_auto_op(auto_op=self.auto_op)
         self.dodge_context.init_auto_op(auto_op=self.auto_op)
         self.target_context.init_auto_op(auto_op=self.auto_op)
+
+    def _trim_op_cache(self, keep: str) -> None:
+        """把已构建的自动战斗配置缓存裁到上限内。
+
+        `_op_cache` 原来是只增不减的：用户在界面上逐个试配置，每试一份就常驻一份
+        构建好的 operator（实测 5 份配置 RSS +56.8MB、耗时 1513ms）。
+        这里按「先放进来先淘汰」的顺序裁掉多余的，但**不会**淘汰当前正在用的那份。
+
+        Args:
+            keep: 本次刚放入、需要保留的 key
+        """
+        while len(self._op_cache) > MAX_OP_CACHE_SIZE:
+            for cached_key in list(self._op_cache.keys()):
+                if cached_key != keep and self._op_cache[cached_key] is not self.auto_op:
+                    del self._op_cache[cached_key]
+                    break
+            else:
+                # 剩下的都在使用中，不再淘汰
+                return
 
     def start_auto_battle(self) -> None:
         """

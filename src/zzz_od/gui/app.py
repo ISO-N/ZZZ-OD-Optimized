@@ -274,6 +274,11 @@ except Exception:
     _init_error = f"启动一条龙失败，报错信息如下:\n{stack_trace}"
 
 
+# 启动失败时打开的排障入口
+# 这里刻意写死，不读 project_config：能走到这个分支说明初始化已经失败，再读配置可能二次抛错
+TROUBLESHOOT_URL = 'https://github.com/ISO-N/ZZZ-OD-Optimized#自助排障'
+
+
 # 初始化应用程序，并启动主窗口
 def main() -> None:
     if _init_error is not None:
@@ -285,7 +290,7 @@ def main() -> None:
 
         # 如果用户点击确定，则打开排障文档
         if result == 1:  # IDOK
-            webbrowser.open("https://docs.qq.com/doc/p/7add96a4600d363b75d2df83bb2635a7c6a969b5")
+            webbrowser.open(TROUBLESHOOT_URL)
 
         sys.exit(1)
 

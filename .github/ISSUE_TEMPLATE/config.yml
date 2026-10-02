@@ -1,4 +1,6 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Community
-    url: https://one-dragon.com/zzz/zh/home.html
+  - name: 安装与排障说明
+    url: https://github.com/ISO-N/ZZZ-OD-Optimized#自助排障
+  - name: 上游项目（本分支的上游，问题也可在上游检索）
+    url: https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon/issues

@@ -105,7 +105,7 @@ class DetectObjectResult:
 class DetectFrameResult:
 
     def __init__(self,
-                 raw_image: MatLike,
+                 raw_image: MatLike | None,
                  results: List[DetectObjectResult],
                  run_time: Optional[float] = None,
                  ):
@@ -115,8 +115,8 @@ class DetectFrameResult:
         self.run_time: float = time.time() if run_time is None else run_time
         """识别时间"""
 
-        self.raw_image: MatLike = raw_image
-        """识别的原始图片"""
+        self.raw_image: MatLike | None = raw_image
+        """识别的原始图片。历史记录里存 None 以避免钉住整张截图（见 draw_detections 的说明）"""
 
         self.results: List[DetectObjectResult] = results
         """识别的结果"""
@@ -198,7 +198,12 @@ def draw_detections(detect_result: DetectFrameResult, mask_alpha=0.3) -> MatLike
     :param mask_alpha:
     :return:
     """
-    image: MatLike = detect_result.raw_image
+    image: MatLike | None = detect_result.raw_image
+    if image is None:
+        raise ValueError(
+            '该识别结果没有保留原始图片（通常来自 run_result_history），无法绘制。'
+            '请对 run() 直接返回的那一帧调用 draw_detections。'
+        )
     results: List[DetectObjectResult] = detect_result.results
     det_img = image.copy()
 

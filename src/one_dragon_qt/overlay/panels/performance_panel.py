@@ -44,9 +44,14 @@ class PerformancePanel(ResizablePanel):
     def update_items(self, items: list[PerfTraceItem]) -> None:
         if self._edit_mode:
             return
+        # 单遍取「每个 metric 最新的那一条」。
+        # 原来先 `sorted(items, key=...)` 再遍历，只为了拿到最后一个；
+        # 面板每 200ms 刷一次、items 上限 2000，白排一次序不划算。
         latest_by_metric: dict[str, PerfTraceItem] = {}
-        for item in sorted(items, key=lambda x: x.created):
-            latest_by_metric[item.metric] = item
+        for item in items:
+            prev = latest_by_metric.get(item.metric)
+            if prev is None or item.created > prev.created:
+                latest_by_metric[item.metric] = item
 
         metric_keys = self._sorted_metric_keys(latest_by_metric.keys())
 

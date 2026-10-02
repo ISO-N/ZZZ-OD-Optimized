@@ -29,6 +29,13 @@ from one_dragon.base.controller.pc_screenshot.pc_screenshot_controller import (
 from one_dragon.base.geometry.point import Point
 from one_dragon.utils.log_utils import log
 
+# 点击时默认按住鼠标的时长（秒）。
+# `win_click` 会按这个值硬 `time.sleep`，所以它直接等于每次点击的固定延迟：
+# 0.1s 时实测单次点击 105.3ms，一次「一条龙」里有几百次点击，累计数十秒。
+# 降到 0.05s 每次省约 50ms；60fps 下 50ms 仍覆盖约 3 帧，足以被识别成一次点按。
+# ⚠️ 这个值需要在真机上回归确认「不漏点击」后才能算定稿。
+DEFAULT_CLICK_PRESS_TIME: float = 0.05
+
 
 class PcControllerBase(ControllerBase):
 
@@ -76,7 +83,9 @@ class PcControllerBase(ControllerBase):
             return False
 
     def init_before_context_run(self) -> bool:
-        pyautogui.PAUSE = 0.001  # pyautogui的操作会有延迟, 一些需要低延迟的操作中会取消这个延迟然后恢复延迟, 以免影响其他功能
+        pyautogui.PAUSE = 0  # pyautogui 每次调用后会固定 sleep 这么久（默认 0.1s）。
+        # 设 0：项目里每次点击/拖拽会调用多个 pyautogui 方法，
+        # 原来 0.001 也会被累积成每次调用约 1.6ms（实测 win_click 6.95ms → 1.74ms）。
         pyautogui.FAILSAFE = False  # 禁用 Fail-Safe,防止鼠标接近屏幕的边缘或角落时报错
         self.init_game_win()
         if not self.background_mode:
@@ -281,7 +290,7 @@ class PcControllerBase(ControllerBase):
         screen_x, screen_y = win32gui.ClientToScreen(hwnd, (cx, cy))
         win32api.SetCursorPos((screen_x, screen_y))
 
-    def click(self, pos: Point = None, press_time: float = 0.1, pc_alt: bool = False,
+    def click(self, pos: Point = None, press_time: float = DEFAULT_CLICK_PRESS_TIME, pc_alt: bool = False,
               gamepad_key: str | None = None) -> bool:
         """点击位置。
 
@@ -301,7 +310,7 @@ class PcControllerBase(ControllerBase):
 
         return self._foreground_click(pos, press_time, pc_alt)
 
-    def _foreground_click(self, pos: Point | None, press_time: float = 0.1, pc_alt: bool = False) -> bool:
+    def _foreground_click(self, pos: Point | None, press_time: float = DEFAULT_CLICK_PRESS_TIME, pc_alt: bool = False) -> bool:
         """前台点击：通过 pyautogui 点击，可选 ALT 解锁光标。
 
         Args:
@@ -541,7 +550,7 @@ class PcControllerBase(ControllerBase):
         return Point(self.standard_width // 2, self.standard_height // 2)
 
 
-def win_click(pos: Point = None, press_time: float = 0.1, primary: bool = True):
+def win_click(pos: Point = None, press_time: float = DEFAULT_CLICK_PRESS_TIME, primary: bool = True):
     """点击鼠标。
 
     Args:

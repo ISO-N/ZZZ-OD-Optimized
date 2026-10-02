@@ -122,13 +122,20 @@ class OverlayConfig(YamlConfig):
         data = self.get("overlay", {})
         if not isinstance(data, dict):
             data = {}
-        merged = deepcopy(_DEFAULT_OVERLAY_CONFIG)
+        # 浅拷贝即可：_DEFAULT_OVERLAY_CONFIG 里的 4 个嵌套 dict
+        # （panel_free_mode_map / performance_metric_enabled_map / panel_geometry /
+        #  panel_appearance）在本函数后面都会被整体替换掉，不会改到模块级常量。
+        # 原来这里对整个默认配置做 deepcopy，实测占本函数 58% 的耗时，
+        # 而本函数是「每个属性 getter 都会走」的热路径（一次 overlay tick 读 27 个属性）。
+        merged = dict(_DEFAULT_OVERLAY_CONFIG)
         merged.update(data)
 
         panel_geometry = merged.get("panel_geometry", {})
         if not isinstance(panel_geometry, dict):
             panel_geometry = {}
-        default_geometry = deepcopy(_DEFAULT_PANEL_GEOMETRY)
+        # 逐层浅拷贝就够（值都是 int），比 deepcopy 便宜得多；
+        # 下面会改 default_geometry[panel_name]，所以内层必须复制。
+        default_geometry = {name: dict(geo) for name, geo in _DEFAULT_PANEL_GEOMETRY.items()}
         for panel_name, geometry in panel_geometry.items():
             if panel_name not in default_geometry:
                 continue
@@ -147,7 +154,7 @@ class OverlayConfig(YamlConfig):
         panel_appearance = merged.get("panel_appearance", {})
         if not isinstance(panel_appearance, dict):
             panel_appearance = {}
-        default_appearance = deepcopy(_DEFAULT_PANEL_APPEARANCE)
+        default_appearance = {name: dict(app) for name, app in _DEFAULT_PANEL_APPEARANCE.items()}
         for panel_name, appearance in panel_appearance.items():
             if panel_name not in default_appearance:
                 continue

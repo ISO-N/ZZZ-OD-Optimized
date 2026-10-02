@@ -43,17 +43,45 @@ class MoveTargetWrapper:
         self.entire_rect: Rect = self.target_rect_list[0]
         self.merge_parent = None  # 合并后的父节点
 
+    def merge_root(self) -> "MoveTargetWrapper":
+        """沿 merge_parent 一路找到合并组的根节点（该组的代表）。
+
+        原实现只向上解析**一层**。链式合并（A 并 B、B 并 C……）之后，
+        同一个组的成员会解析到不同的中间节点，于是「同一批矩形」被反复
+        extend 进同一个组：长度越来越长、随后的合并又加得更多，实测随机布点下
+        单帧能涨到几十万个矩形、耗时数秒。
+
+        解析到根之后，同组成员必然得到同一个对象，`this is other` 就能拦住重复合并。
+        """
+        node = self
+        hops = 0
+        while node.is_mixed and node.merge_parent is not None and node.merge_parent is not node:
+            node = node.merge_parent
+            hops += 1
+            if hops > 64:  # 防御：万一出现环也不要死循环
+                break
+        return node
+
     def merge_another_target(self, other) -> bool:
         """
         尝试合并一个入口
         @return: 是否合并成功
         """
-        if other.is_mixed and other.merge_parent is not None:
-            other: MoveTargetWrapper = other.merge_parent
+        other = other.merge_root()
+        this = self.merge_root()
 
-        this = self
-        if this.is_mixed and this.merge_parent is not None:
-            this: MoveTargetWrapper = this.merge_parent
+        # 解析到根之后两者落到同一个包装对象上，说明它们本来就属于同一组
+        # （包括自己和自己）。此时继续往下走会出两个问题：
+        # ① `this.target_rect_list.extend(other.target_rect_list)` 变成重复 extend
+        #    甚至「自己 extend 自己」，长度每合并一次翻倍 → 指数爆炸。
+        #    实测帧内 5 个互相靠近的检测框会产出 327680 个矩形、耗时 45.7ms；
+        #    6 个则长时间跑不完。
+        # ② `other.merge_parent = this` 会把 merge_parent 指向自己，于是下面
+        #    `get_entry_target` 里 `merge_parent is None` 的过滤会把目标全部丢掉，
+        #    结果就是「目标永远选不出来」。
+        # 所以同组直接判定为不能合并。
+        if this is other:
+            return False
 
         is_merge = False
         for x in this.target_rect_list:

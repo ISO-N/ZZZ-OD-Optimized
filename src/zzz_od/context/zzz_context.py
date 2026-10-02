@@ -21,12 +21,21 @@ class ZContext(OneDragonContext):
 
         OneDragonContext.__init__(self)
         self._ocr_v6_downloading: bool = False  # 后台下载 V6 是否进行中 防止重复启动
-
-        # 后续所有用到自动战斗的 都统一设置到这个里面
-        from zzz_od.auto_battle.auto_battle_context import AutoBattleContext
-        self.auto_battle_context: AutoBattleContext = AutoBattleContext(self)
+        self._telemetry_started: bool = False  # 遥测是否真正启动过 避免关闭时误构造
 
     #------------------- 需要懒加载的都使用 @cached_property -------------------#
+
+    @cached_property
+    def auto_battle_context(self):
+        """自动战斗上下文。
+
+        必须懒加载：它的 import 链会拉起 scipy + sklearn + onnxruntime
+        （实测三合一约 1432ms，占 ZContext 构造耗时的 95%），
+        而这些库只有在真正用到自动战斗/音量闪避时才需要。
+        原来在 __init__ 里直接构造，等于「打开 GUI」就要多等 1 秒多。
+        """
+        from zzz_od.auto_battle.auto_battle_context import AutoBattleContext
+        return AutoBattleContext(self)
 
     #------------------- 以下是 游戏/脚本级别的 -------------------#
 
@@ -51,6 +60,11 @@ class ZContext(OneDragonContext):
             WorldPatrolService,
         )
         return WorldPatrolService(self)
+
+    @cached_property
+    def privacy_config(self):
+        from one_dragon.base.config.privacy_config import PrivacyConfig
+        return PrivacyConfig()
 
     @cached_property
     def telemetry(self):
@@ -202,11 +216,12 @@ class ZContext(OneDragonContext):
                     )
                 )
                 done = v6_matcher.download(
-                    download_by_github=True,
-                    download_by_gitee=False,
-                    download_by_mirror_chan=False,
+                    source_order=self.env_config.get_resource_source_order(),
                     ghproxy_url=self.env_config.gh_proxy_url if self.env_config.is_gh_proxy else None,
                     proxy_url=self.env_config.personal_proxy if self.env_config.is_personal_proxy else None,
+                    on_source_success=self._on_resource_source_success,
+                    on_source_failure=self._on_resource_source_failure,
+                    fallback_on_slow=self.env_config.is_resource_source_auto,
                 )
                 if done:
                     # 只落盘配置 不立刻切换 避免切换失败导致当前可用的 V5 失效
@@ -227,14 +242,18 @@ class ZContext(OneDragonContext):
         self.auto_battle_context.init_screen_area()  # 自动战斗相关的区域 依赖 ScreenLoader
 
     def init_others(self) -> None:
-        self.telemetry.initialize()  # 遥测
+        # 遥测默认关闭；开启后会上报匿名日活信息，默认不采集
+        if self.privacy_config.telemetry_enabled:
+            self.telemetry.initialize()
+            self._telemetry_started = True
 
     def after_app_shutdown(self) -> None:
         """
         App关闭后进行的操作 关闭一切可能资源操作
         """
-        if hasattr(self, 'telemetry') and self.telemetry:
+        if self._telemetry_started:
             self.telemetry.shutdown()
+            self._telemetry_started = False
 
         # 上层清理依赖框架服务(如 StateRecordService)，必须先于框架清理
         self.withered_domain.after_app_shutdown()

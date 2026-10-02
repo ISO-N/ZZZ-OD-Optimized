@@ -28,6 +28,9 @@ _LEVEL_COLOR = {
     "CRITICAL": "#ff5f5f",
 }
 
+# 日志重绘合并窗口（毫秒）：窗口内到达的多条日志只触发一次整篇重绘。
+LOG_RENDER_COALESCE_MS: int = 100
+
 
 class LogPanel(ResizablePanel):
     """Overlay log panel."""
@@ -63,19 +66,39 @@ class LogPanel(ResizablePanel):
         self._cleanup_timer.timeout.connect(self._drop_expired)
         self._cleanup_timer.start(1000)
 
+        # 日志重绘合并窗口：append_log 原来每收一条日志就整篇重建富文本
+        # （满 120 行时约 4ms/次）。真实会话速率 p90 是 33 条/秒（约 133ms CPU/秒），
+        # 突发能到 673 条/秒（单核 271%）。改成最多 10 次重绘/秒，肉眼无感。
+        self._render_timer = QTimer(self)
+        self._render_timer.setSingleShot(True)
+        self._render_timer.setInterval(LOG_RENDER_COALESCE_MS)
+        self._render_timer.timeout.connect(self._render)
+
     def set_appearance(self, font_size: int, panel_opacity: int) -> None:
+        # 变更守卫：follow 定时器每 120ms 用同样的值重设一遍，
+        # 而 _render() 会重建整篇富文本（满 120 行时约 4ms/次）。
+        if (max(10, min(28, int(font_size))) == self._font_size
+                and max(5, min(100, int(panel_opacity))) == self._panel_opacity):
+            return
         super().set_appearance(font_size, panel_opacity)
         self.setWindowOpacity(self._panel_opacity / 100.0)
         self._render()
 
     def set_text_color(self, color: str) -> None:
-        self._text_color = str(color or "").strip() or "#efefef"
+        color = str(color or "").strip() or "#efefef"
+        if color == self._text_color:
+            return  # 变更守卫：颜色没变就不用重建富文本
+        self._text_color = color
         self._text_widget.set_text_color(self._text_color)
         self._render()
 
     def set_limits(self, max_lines: int, fade_seconds: int) -> None:
-        self._max_lines = max(20, int(max_lines))
-        self._fade_seconds = max(3, int(fade_seconds))
+        max_lines = max(20, int(max_lines))
+        fade_seconds = max(3, int(fade_seconds))
+        if max_lines == self._max_lines and fade_seconds == self._fade_seconds:
+            return  # 变更守卫：每 tick 都调，值没变就别做清理
+        self._max_lines = max_lines
+        self._fade_seconds = fade_seconds
         self._drop_expired()
 
     def append_log(self, event: OverlayLogEvent) -> None:
@@ -92,7 +115,12 @@ class LogPanel(ResizablePanel):
         )
         while len(self._lines) > self._max_lines:
             self._lines.popleft()
-        self._render()
+        self._schedule_render()
+
+    def _schedule_render(self) -> None:
+        """把短时间内多次日志触发的重绘合并成一次（见 __init__ 里的说明）。"""
+        if not self._render_timer.isActive():
+            self._render_timer.start()
 
     def clear(self) -> None:
         self._lines.clear()

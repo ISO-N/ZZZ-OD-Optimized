@@ -9,11 +9,11 @@
             "author": "maintainer"
         },
         {
-            "content": "本项目是面向 Windows 的《绝区零》自动化工具，核心能力是图像识别、OCR、YOLO 与输入控制，提供自动战斗、闪避助手、日常任务、空洞作战、定时任务和多账号等功能。用户向功能说明以 .github/README.md 和官网为准。",
+            "content": "本仓库是上游 OneDragon-Anything/ZenlessZoneZero-OneDragon 的性能优化分支（ISO-N/ZZZ-OD-Optimized），只做性能优化、不新增玩法功能，非官方发布；下载源只有 GitHub 一个（无 CNB / Gitee / MirrorChyan），遥测默认关闭。用户向功能说明以本仓库的 .github/README.md 为准，官网 one-dragon.com 属上游、仅作参考。",
             "author": "maintainer"
         },
         {
-            "content": "项目采用 Python 3.11、uv、PySide6 和 src-layout。src/one_dragon 是通用框架，src/one_dragon_qt 是通用 Qt 层，src/onnxocr 是 OCR 支持，src/zzz_od 是绝区零业务代码；assets/ 存放游戏画面、模板、模型和配置数据。",
+            "content": "本仓库是面向 Windows 的《绝区零》自动化工具，核心能力是图像识别、OCR、YOLO 与输入控制，提供自动战斗、闪避助手、日常任务、空洞作战、定时任务和多账号等功能。项目采用 Python 3.11、uv、PySide6 和 src-layout；src/one_dragon 是通用框架，src/one_dragon_qt 是通用 Qt 层，src/onnxocr 是 OCR 支持，src/zzz_od 是绝区零业务代码，assets/ 存放游戏画面、模板、模型和配置数据。",
             "author": "maintainer"
         },
         {

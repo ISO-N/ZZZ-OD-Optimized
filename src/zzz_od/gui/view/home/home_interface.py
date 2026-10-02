@@ -92,17 +92,18 @@ class ButtonGroup(QWidget):
         layout.addWidget(doc_button)
         self.buttons.append(doc_button)
 
-        # 创建 频道 按钮
-        chat_button = IconButton(
-            FluentIcon.CHAT.icon(color=QColor("#fff")),
-            tip_title="官方频道",
-            tip_content="加入官方交流频道",
-            isTooltip=True,
-        )
-        chat_button.setIconSize(QSize(30, 30))
-        chat_button.clicked.connect(self.open_chat)
-        layout.addWidget(chat_button)
-        self.buttons.append(chat_button)
+        # 创建 频道 按钮（未配置社区链接时不显示）
+        if self.ctx.project_config.qq_link:
+            chat_button = IconButton(
+                FluentIcon.CHAT.icon(color=QColor("#fff")),
+                tip_title="官方频道",
+                tip_content="加入官方交流频道",
+                isTooltip=True,
+            )
+            chat_button.setIconSize(QSize(30, 30))
+            chat_button.clicked.connect(self.open_chat)
+            layout.addWidget(chat_button)
+            self.buttons.append(chat_button)
 
 
     def open_home(self):
@@ -382,9 +383,11 @@ class HomeInterface(BaseInterface):
 
         h2_layout.setContentsMargins(32, 32, 0, 32)
 
-        # 公告卡片
+        # 公告卡片（未配置公告地址时隐藏，避免留一个空面板）
         self.notice_container = NoticeCard(self.ctx.project_config.notice_url)
         apply_shadow(self.notice_container, blur=28, offset_x=0, offset_y=8, alpha=150)
+        if not self.ctx.project_config.notice_url:
+            self.notice_container.set_notice_enabled(False)
         h2_layout.addWidget(self.notice_container, alignment=Qt.AlignmentFlag.AlignBottom)
 
         h2_layout.addStretch()

@@ -137,7 +137,9 @@ class BattleAssistantInterface(AppRunInterface):
 
         # 共用设置（两种模式共享）
         self.gpu_opt = SwitchSettingCard(
-            icon=FluentIcon.GAME, title='GPU运算', content='游戏画面掉帧的话 可以不启用',
+            icon=FluentIcon.GAME,
+            title='GPU运算',
+            content='默认开启。开启后闪光识别快约 1.7 倍；若游戏画面掉帧可关闭',
         )
         top.add_widget(self.gpu_opt)
 
@@ -172,16 +174,11 @@ class BattleAssistantInterface(AppRunInterface):
             url='https://one-dragon.com/zzz/zh/feat/feat_game_assistant.html'
         )
 
-        shared_btn = HyperlinkButton(
-            text=gt('前往社区'),
-            url='https://pd.qq.com/g/onedrag00n'
-        )
-
         help_card = MultiPushSettingCard(
             icon=FluentIcon.HELP,
             title='使用说明',
             content='先看说明 再使用与提问',
-            btn_list=[desc_btn, guide_btn, shared_btn]
+            btn_list=[desc_btn, guide_btn]
         )
         page.add_widget(help_card)
 

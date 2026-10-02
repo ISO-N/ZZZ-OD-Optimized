@@ -22,11 +22,17 @@ class OverlayTextWidget(QTextEdit):
         self._refresh_style()
 
     def set_appearance(self, font_size: int) -> None:
-        self._font_size = max(10, min(28, int(font_size)))
+        font_size = max(10, min(28, int(font_size)))
+        if font_size == self._font_size:
+            return  # 变更守卫：见 _refresh_style 的说明
+        self._font_size = font_size
         self._refresh_style()
 
     def set_text_color(self, color: str) -> None:
-        self._text_color = str(color or "").strip() or "#eaeaea"
+        color = str(color or "").strip() or "#eaeaea"
+        if color == self._text_color:
+            return  # 变更守卫：颜色没变就不用重建样式表
+        self._text_color = color
         self._refresh_style()
 
     def visible_line_count(self) -> int:

@@ -2,7 +2,7 @@
 name: zzz-one-dragon-player
 description: 绝区零一条龙自动游戏助手 - 让 AI Agent 配合一条龙自动完成游戏日常
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [gaming, automation, zenless-zone-zero, game-bot]
 ---
 
@@ -21,7 +21,7 @@ tags: [gaming, automation, zenless-zone-zero, game-bot]
 
 ### 下载安装
 
-1. 从 GitHub Release 或 Mirror酱 下载安装包（推荐 `-Full-Environment` 完整包）
+1. 从本分支 Release（https://github.com/ISO-N/ZZZ-OD-Optimized/releases/latest ）下载安装包（推荐 `-Full-Environment` 完整包，其次 `-Installer.exe`）
 2. 在固态硬盘根目录创建全英文空文件夹（如 `D:\zzz-od`）
 3. 解压安装包到该文件夹
 4. **以管理员身份运行** `OneDragon-Installer.exe` 完成安装
@@ -120,15 +120,18 @@ OneDragon-Launcher.exe -o -c -i 1    # 自动运行账号1后关闭游戏
 
 ## 常见问题
 
-- **启动失败**：检查游戏路径配置、确认管理员权限、参考[常见问题](https://one-dragon.com/zzz/zh/faq.html)
-- **网络问题**：GitHub/Gitee 至少一个能连通；pip 源至少一个能连通；不通时尝试手机热点
+- **启动失败**：检查游戏路径配置、确认管理员权限、参考[常见问题](https://one-dragon.com/zzz/zh/faq.html)（上游文档，本分支同样适用）
+- **网络问题**：本项目所有依赖默认从 GitHub 下载，GitHub 连不通时在「源配置」里把代理类型改成「GitHub 代理」；pip 源至少一个能连通
 - **识别不准**：更新 ML 模型到最新版本；确认游戏分辨率为 1920x1080 窗口模式
 - **运行卡顿**：确认硬件满足最低配置；关闭其他占用 GPU 的程序
 
 ## 帮助资源
 
-- 快速开始：https://one-dragon.com/zzz/zh/quickstart.html
-- 一条龙功能说明：https://one-dragon.com/zzz/zh/feat_one_dragon/onedragon.html
-- 常见问题：https://one-dragon.com/zzz/zh/faq.html
-- 游戏设置：https://one-dragon.com/zzz/zh/setting_game.html
-- GitHub 仓库：https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon
+> 本仓库是上游 [ZenlessZoneZero-OneDragon](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 的性能优化分支，非官方发布。下面的功能文档来自上游，本分支同样适用。
+
+- 安装与排障（本分支）：https://github.com/ISO-N/ZZZ-OD-Optimized
+- 快速开始（上游）：https://one-dragon.com/zzz/zh/quickstart.html
+- 一条龙功能说明（上游）：https://one-dragon.com/zzz/feat_one_dragon/onedragon.html
+- 常见问题（上游）：https://one-dragon.com/zzz/zh/faq.html
+- 游戏设置（上游）：https://one-dragon.com/zzz/zh/setting_game.html
+- GitHub 仓库（本分支）：https://github.com/ISO-N/ZZZ-OD-Optimized

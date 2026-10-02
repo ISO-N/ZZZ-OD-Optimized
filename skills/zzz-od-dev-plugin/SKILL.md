@@ -2,7 +2,7 @@
 name: zzz-od-dev-plugin
 description: 绝区零一条龙新增内置应用与第三方插件指南，覆盖工厂、常量、运行记录、设置界面和 screen_info 接入
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, one-dragon, application, plugin, development]
 ---
 

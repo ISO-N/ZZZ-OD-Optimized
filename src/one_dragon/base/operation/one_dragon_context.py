@@ -5,7 +5,6 @@ from enum import Enum
 from functools import cached_property
 from pathlib import Path
 
-import cv2
 from pynput import keyboard
 
 from one_dragon.base.config.basic_model_config import BasicModelConfig
@@ -425,6 +424,10 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
             return None
 
         if overlay_rgba.shape[0] != target_h or overlay_rgba.shape[1] != target_w:
+            # cv2 只在这个调试合成里用到，所以放方法内 import：
+            # 顶层 import cv2 实测约 161ms，会白白加进「打开 GUI」的路径。
+            import cv2
+
             overlay_rgba = cv2.resize(
                 overlay_rgba,
                 (target_w, target_h),
@@ -519,16 +522,8 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
                 ContextNotifyEvent.info('资源下载', '开始下载OCR识别模型'),
             )
 
-        success: bool = self.ocr.init_model(
-            source_order=self.env_config.get_resource_source_order(),
-            ghproxy_url=self.env_config.gh_proxy_url if self.env_config.is_gh_proxy else None,
-            proxy_url=self.env_config.personal_proxy if self.env_config.is_personal_proxy else None,
-            on_source_success=self._on_resource_source_success,
-            on_source_failure=self._on_resource_source_failure,
-            fallback_on_slow=self.env_config.is_resource_source_auto,
-        )
+            success: bool = self._load_ocr_model()
 
-        if need_download:
             if success:
                 self.dispatch_event(
                     ContextNotifyEvent.EVENT_ID,
@@ -539,6 +534,38 @@ class OneDragonContext(ContextEventBus, OneDragonEnvContext):
                     ContextNotifyEvent.EVENT_ID,
                     ContextNotifyEvent.error('资源下载', 'OCR识别模型下载失败 可到[设置-资源下载]更换下载源重试'),
                 )
+        else:
+            # 模型文件已就绪时，不在启动同步路径上建 ONNX 会话
+            # （实测建 det+rec(+cls) 三个 session 要 733-1124ms）。
+            # 改成后台线程预热：真正需要时（onnx_ocr_matcher 的 ocr() 有
+            # `if self._model is None: self.init_model()` 懒加载分支）通常已经好了，
+            # 即使没预热完也只会在首次识别时同步补上。
+            threading.Thread(
+                target=self._warm_up_ocr_in_background,
+                daemon=True,
+                name='ocr_warm_up',
+            ).start()
+
+    def _load_ocr_model(self) -> bool:
+        """按当前下载源配置加载（必要时下载）OCR 模型。"""
+        return self.ocr.init_model(
+            source_order=self.env_config.get_resource_source_order(),
+            ghproxy_url=self.env_config.gh_proxy_url if self.env_config.is_gh_proxy else None,
+            proxy_url=self.env_config.personal_proxy if self.env_config.is_personal_proxy else None,
+            on_source_success=self._on_resource_source_success,
+            on_source_failure=self._on_resource_source_failure,
+            fallback_on_slow=self.env_config.is_resource_source_auto,
+        )
+
+    def _warm_up_ocr_in_background(self) -> None:
+        """后台预热 OCR 会话，失败不影响启动（首次识别时会再试）。"""
+        try:
+            if self._load_ocr_model():
+                log.info('OCR 模型后台预热完成')
+            else:
+                log.warning('OCR 模型后台预热未成功，将在首次识别时重试')
+        except Exception:
+            log.warning('OCR 模型后台预热异常，将在首次识别时重试', exc_info=True)
 
     def _confirm_resource_download(self, title: str, note: str) -> bool:
         """自动下载资源前请求前端确认。

@@ -15,29 +15,23 @@
 
 ### 1. 获取代码
 
-- **组织/项目成员**（有主仓 push 权）：直接 clone
+- **本仓（`ISO-N/ZZZ-OD-Optimized`，性能优化分支）**：直接 clone
 
   ```powershell
-  git clone https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon.git
-  cd ZenlessZoneZero-OneDragon
+  git clone https://github.com/ISO-N/ZZZ-OD-Optimized.git
+  cd ZZZ-OD-Optimized
   ```
 
-- **外部贡献者**（无 push 权）：先 Fork 再 clone 自己的 fork，提 PR 回主仓
+- **想参与上游开发**：fork [`OneDragon-Anything/ZenlessZoneZero-OneDragon`](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 再 clone 自己的 fork，提 PR 回上游主仓。
+- **想同步上游的新功能到本仓**：把上游配成 `upstream` remote（clone 只会设 `origin`）：
 
-  1. 在 [仓库页面](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 右上角点 **Fork**，fork 到自己账号下。
-  2. clone **你 fork 的仓库**（`<你的账号>` 换成 GitHub 用户名）：
+  ```powershell
+  git remote add upstream https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon.git
+  git fetch upstream
+  git merge --no-ff upstream/main
+  ```
 
-     ```powershell
-     git clone https://github.com/<你的账号>/ZenlessZoneZero-OneDragon.git
-     cd ZenlessZoneZero-OneDragon
-     ```
-  3. （可选）配 upstream remote，方便后续同步主仓更新（clone 只会设 `origin`，upstream 需手动加）：
-
-     ```powershell
-     git remote add upstream https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon.git
-     ```
-
-> 其余相关仓库（测试仓 / yolo 训练仓 / 数据集 / 官网 blog）见 [相关仓库](repositories.md)。
+> 其余相关仓库（环境与模型仓 / yolo 训练仓 / 测试仓 / 数据集）见 [相关仓库](repositories.md)。
 
 ### 2. 安装 uv
 

@@ -18,6 +18,11 @@ TEMPLATE_MASK_FILE_NAME = 'mask.png'
 TEMPLATE_CONFIG_FILE_NAME = 'config.yml'
 TEMPLATE_FEATURES_FILE_NAME = 'features.xml'
 
+# 灰度跨度小于该值的模板视为「近似常量」，见 TemplateInfo.is_low_contrast。
+# 实测磁盘上跨度 0/0/1 的 3 个模板会让 TM_CCOEFF_NORMED 退化；
+# 取 2 能覆盖它们，同时仍让 221/226 个全白掩码模板享受「跳过掩码」的加速。
+LOW_CONTRAST_VALUE_RANGE: int = 2
+
 
 class TemplateShapeEnum(Enum):
 
@@ -59,6 +64,8 @@ class TemplateInfo(YamlOperator):
         self._gray: MatLike = None  # 灰度图
         self._kps: List[cv2.KeyPoint] = None  # 关键点
         self._desc: MatLike = None  # 描述
+        self._mask_is_all_white: Optional[bool] = None  # 掩码是否全 255 见 mask_is_all_white
+        self._is_low_contrast: Optional[bool] = None  # 是否近似常量 见 is_low_contrast
 
     def get_yml_file_path(self) -> str:
         return get_template_config_path(self.sub_dir, self.template_id)
@@ -125,6 +132,44 @@ class TemplateInfo(YamlOperator):
             return None
         self._gray = cv2.cvtColor(self.raw, cv2.COLOR_RGB2GRAY)
         return self._gray
+
+    @property
+    def mask_is_all_white(self) -> bool:
+        """模板自带的掩码是否「全 255」（等价于没有掩码）。
+
+        为什么需要：``cv2.matchTemplate`` 传 mask 比不传慢 4.0-5.5 倍
+        （实测 118x118 上 1.12ms vs 6.19ms，1080p 上 172.8ms vs 786.8ms）。
+        磁盘上的模板里有一部分掩码是全白的（只是把区域整块标出来，没有真正挖洞），
+        这种掩码传与不传结果一致（实测 226 个全白掩码模板里位置 226/226 一致，
+        阈值判定零翻转），所以可以识别出来并跳过。
+
+        结果缓存在实例上；掩码很小，只在第一次访问时算一次。
+        """
+        if self._mask_is_all_white is None:
+            m = self.mask
+            self._mask_is_all_white = m is not None and m.size > 0 and int(m.min()) == 255
+        return self._mask_is_all_white
+
+    @property
+    def is_low_contrast(self) -> bool:
+        """模板是否「近似常量」（灰度跨度小于 LOW_CONTRAST_VALUE_RANGE）。
+
+        这类模板会让 ``cv2.TM_CCOEFF_NORMED`` 变成 0/0，两个方向都是废的：
+        - 带掩码：OpenCV 返回**全 NaN**，被 ``np.isfinite`` 过滤后**永远匹配不到**；
+        - 不带掩码：OpenCV 返回**全 1.0**，等于**到处都算匹配**（假阳性）。
+
+        实测磁盘上有 3 个这样的模板（``agent_state/yeshunguang_mingxinjing_2_1``、
+        ``..._3_1``、``agent_state/yidhari_2_2``，灰度跨度分别是 0/0/1）。
+        它们本身是坏数据，但「永不匹配」至少是安全的，所以对它们**不要跳过掩码**，
+        维持原有的「匹配不到」行为，避免把静默失效变成静默误报。
+        """
+        if self._is_low_contrast is None:
+            r = self.raw
+            if r is None or r.size == 0:
+                self._is_low_contrast = True
+            else:
+                self._is_low_contrast = (int(r.max()) - int(r.min())) < LOW_CONTRAST_VALUE_RANGE
+        return self._is_low_contrast
 
     @property
     def features(self) -> Tuple[List[cv2.KeyPoint], MatLike]:

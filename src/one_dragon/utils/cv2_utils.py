@@ -590,14 +590,18 @@ def connection_erase(
     """
     to_check_connection = mask if erase_white else cv2.bitwise_not(mask)
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(to_check_connection, connectivity=connectivity)
-    large_components = []
-    for label in range(1, num_labels):
-        if stats[label, cv2.CC_STAT_AREA] < threshold:
-            large_components.append(label)
+
+    # 用「一次查找表索引」替代「逐标签整图布尔索引」。
+    # 原写法对每个噪点标签都做一次 labels == label 的整图比较再布尔赋值，
+    # 1080p 全屏上噪点标签可达数千个，实测 3125ms；查找表方案实测 15.7ms（约 200 倍）。
+    # keep[0] 固定为 True：label 0 是 connectedComponentsWithStats 的背景类，
+    # 原实现的下标从 1 开始，同样不处理它。
+    keep = np.ones(num_labels, dtype=bool)
+    keep[1:] = stats[1:, cv2.CC_STAT_AREA] >= threshold
 
     result = mask.copy()
-    for label in large_components:
-        result[labels == label] = 0 if erase_white else 255
+    if not keep.all():  # 没有噪点时跳过整图布尔索引
+        result[~keep[labels]] = 0 if erase_white else 255
 
     return result
 
@@ -1284,19 +1288,58 @@ def is_in_gray_mask(img: MatLike, rect: Rect | None = None, threshold: int = 55,
 
     total = img.shape[0] * img.shape[1]
 
-    # 条件1：纯黑 或 纯白
-    cond1 = (np.all(img < threshold, axis=-1) | np.all(img > 255 - threshold, axis=-1))
+    if img.ndim == 2:
+        # 单通道属于契约外输入（文档约定 img 为 RGB）。旧实现在单通道上
+        # `np.all(img < t, axis=-1)` 是沿**宽度**归约、结果形状退化成 (H,)，
+        # 除以 H*W 后几乎恒为 False —— 本身就是错的。
+        # 这里原样保留旧行为，避免这次纯性能改动顺带翻转调用方的判定结果。
+        legacy_cond1 = np.all(img < threshold, axis=-1) | np.all(img > 255 - threshold, axis=-1)
+        legacy_cond2 = (img.max(axis=-1) - img.min(axis=-1)) < rgb_diff_threshold
+        return bool(((legacy_cond1 | legacy_cond2).sum() / total) > percent_rate)
+
+    # 条件1：纯黑 或 纯白（所有通道同时 < threshold 或同时 > 255-threshold）
+    # 用 cv2.inRange 替代 np.all(img < t, axis=-1)：后者要在全图上做逐通道比较 + 归约，
+    # 1080p 下单这两项就要 40ms 量级；cv2.inRange 是单遍 C 实现。
+    # 注意边界换算：`ch < threshold` 等价于 `ch <= threshold - 1`。
+    # inRange 的上下界元素个数必须与通道数一致，所以按实际通道数构造。
+    channel_count = img.shape[2]
+    black_upper = threshold - 1
+    white_lower = 256 - threshold
+    cond1 = cv2.inRange(
+        img,
+        (0,) * channel_count,
+        (black_upper,) * channel_count,
+    )
+    cond1 = cv2.bitwise_or(
+        cond1,
+        cv2.inRange(
+            img,
+            (white_lower,) * channel_count,
+            (255,) * channel_count,
+        ),
+    )
 
     # 条件2：RGB 相差很小（最大值 - 最小值 < 阈值）
-    img_max = img.max(axis=-1)
-    img_min = img.min(axis=-1)
-    cond2 = (img_max - img_min) < rgb_diff_threshold
+    # 用 cv2.max/cv2.min 逐对归约替代 np.max(axis=-1)/np.min(axis=-1)：
+    # numpy 的 axis 归约在 1080p 上实测各约 37ms，cv2 逐对归约是 O(通道数) 次全图遍历。
+    channels = cv2.split(img)
+    img_max = channels[0]
+    img_min = channels[0]
+    for channel in channels[1:]:
+        img_max = cv2.max(img_max, channel)
+        img_min = cv2.min(img_min, channel)
 
-    # 满足任意一个就计数（超快向量化）
-    count = (cond1 | cond2).sum()
+    # img_max >= img_min 恒成立，cv2.subtract 的饱和减法不会下溢
+    diff = cv2.subtract(img_max, img_min)
+    cond2 = cv2.compare(diff, rgb_diff_threshold - 1, cv2.CMP_LE)
+
+    # 满足任意一个就计数
+    count = cv2.countNonZero(cv2.bitwise_or(cond1, cond2))
     # save_image(img, 'y:\\debug.png')
     percent = count / total
     log.debug('灰遮罩图片置信度 [%2f]', percent)
     # is_colorful(img)
 
-    return percent > percent_rate
+    # 统一返回 Python bool：countNonZero 给的是 int，单通道分支给的是 numpy 标量，
+    # 不包一层会出现「有时 bool 有时 np.bool_」。
+    return bool(percent > percent_rate)

@@ -132,14 +132,23 @@ class ResizablePanel(QFrame):
         When enabled on Windows, normal clicks on the panel body pass through
         to the game window. Resize edges and drag header remain interactive.
         """
-        self._passthrough_on_body = bool(enabled)
+        enabled = bool(enabled)
+        if enabled == self._passthrough_on_body:
+            return
+        self._passthrough_on_body = enabled
 
     def set_panel_opacity(self, opacity_percent: int) -> None:
-        self._panel_opacity = max(5, min(100, int(opacity_percent)))
+        opacity_percent = max(5, min(100, int(opacity_percent)))
+        if opacity_percent == self._panel_opacity:
+            return
+        self._panel_opacity = opacity_percent
         self._refresh_style()
 
     def set_free_mode(self, enabled: bool) -> None:
-        self._free_mode = bool(enabled)
+        enabled = bool(enabled)
+        if enabled == self._free_mode:
+            return
+        self._free_mode = enabled
         self._refresh_style()
         self._sync_toolbar_state()
 
@@ -222,9 +231,21 @@ class ResizablePanel(QFrame):
         tw.setHtml("<br>".join(lines))
 
     def set_appearance(self, font_size: int, panel_opacity: int) -> None:
-        self._font_size = max(10, min(28, int(font_size)))
-        self._panel_opacity = max(5, min(100, int(panel_opacity)))
-        self.set_panel_opacity(self._panel_opacity)
+        """设置字号与不透明度。
+
+        变更守卫：overlay 的 follow 定时器每 120ms 会把同样的值重新设一遍，
+        而 _refresh_style() 会走 setStyleSheet（Qt 要重新解析整张样式表）。
+        实测 5 个面板每 tick 17ms、8.33Hz 就是约 142ms CPU/秒。
+        值没变就直接返回。
+        """
+        font_size = max(10, min(28, int(font_size)))
+        panel_opacity = max(5, min(100, int(panel_opacity)))
+        if font_size == self._font_size and panel_opacity == self._panel_opacity:
+            return
+        self._font_size = font_size
+        self._panel_opacity = panel_opacity
+        # 直接刷新样式，不走带守卫的 set_panel_opacity（这里字段已经先赋值了）
+        self._refresh_style()
         if self._edit_text_widget is not None and hasattr(self._edit_text_widget, "set_appearance"):
             self._edit_text_widget.set_appearance(self._font_size)
         self._sync_toolbar_state()

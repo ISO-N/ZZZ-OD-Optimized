@@ -26,11 +26,9 @@ from one_dragon.utils.log_utils import log
 DEFAULT_OCR_MODEL_NAME: str = 'ppocrv5'
 PPOCRV6_MODEL_NAME: str = 'ppocrv6'
 
-# OneDragon-Env 仓库各源的 release 下载地址
+# OneDragon-Env 仓库的 release 下载地址（只保留 GitHub 源）
 OCR_DOWNLOAD_URLS: dict[str, str] = {
     'github': 'https://github.com/OneDragon-Anything/OneDragon-Env/releases/download',
-    'cnb': 'https://cnb.cool/OneDragon-Anything/OneDragon-Env/-/releases/download',
-    'gitee': 'https://gitee.com/OneDragon-Anything/OneDragon-Env/releases/download',
 }
 
 
@@ -564,7 +562,7 @@ class OnnxOcrMatcher(OcrMatcher, ZipDownloader):
 
 def __debug():
     ocr = OnnxOcrMatcher()
-    ocr.init_model(source_order=['gitee'])
+    ocr.init_model(source_order=['github'])
 
     from one_dragon.utils import debug_utils
     img = debug_utils.get_debug_image('1')

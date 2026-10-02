@@ -311,7 +311,7 @@ if "%is_old_version%"=="true" (
     rem --- 自动打开浏览器跳转下载页面 ---
     echo.
     echo 正在为您打开下载页面...
-    start "" "https://one-dragon.com/zzz/zh/quickstart.html#%E5%AE%89%E8%A3%85"
+    start "" "https://github.com/ISO-N/ZZZ-OD-Optimized/releases/latest"
     
 ) else (
     echo.

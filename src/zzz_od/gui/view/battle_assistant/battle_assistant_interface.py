@@ -174,16 +174,11 @@ class BattleAssistantInterface(AppRunInterface):
             url='https://one-dragon.com/zzz/zh/feat/feat_game_assistant.html'
         )
 
-        shared_btn = HyperlinkButton(
-            text=gt('前往社区'),
-            url='https://pd.qq.com/g/onedrag00n'
-        )
-
         help_card = MultiPushSettingCard(
             icon=FluentIcon.HELP,
             title='使用说明',
             content='先看说明 再使用与提问',
-            btn_list=[desc_btn, guide_btn, shared_btn]
+            btn_list=[desc_btn, guide_btn]
         )
         page.add_widget(help_card)
 

@@ -8,24 +8,20 @@ HTTP 资源（OCR 模型、YOLO 模型、启动器等 release 附件）的下载
 
 ```yaml
 resource_download:
-  sources:            # 资源下载源元数据
+  sources:            # 资源下载源元数据（本分支只保留 GitHub 一个源）
     github:
       label: GitHub
       use_proxy: true # 是否使用 ghproxy 代理
-    cnb:
-      label: CNB
-      use_proxy: false
   recommend:          # 按系统语言推荐的源
-    zh: cnb
+    zh: github
     en: github
   repos:              # 各 release 仓库在不同源上的 release 根路径
     main:             # 主仓库（启动器）
-      github: "https://github.com/.../releases"
-      cnb: "https://cnb.cool/.../-/releases"
+      github: "https://github.com/ISO-N/ZZZ-OD-Optimized/releases"
     env:              # OneDragon-Env（OCR 模型、环境文件）
-      ...
+      github: "https://github.com/OneDragon-Anything/OneDragon-Env/releases"
     yolo:             # OneDragon-YOLO（识别模型）
-      ...
+      github: "https://github.com/OneDragon-Anything/OneDragon-YOLO/releases"
   models:             # 项目识别模型声明
     detector:
       label: 目标识别
@@ -38,7 +34,7 @@ resource_download:
         - labels.csv
 ```
 
-- `repos` 存 release 根路径（以 `/releases` 结尾）。附件地址由 `RepoConfig.get_resource_asset_urls(repo_key, tag, file_name)` 拼装：`tag` 非空时为 `{root}/download/{tag}/{file}`，为空时为 `{root}/latest/download/{file}`。GitHub 与 cnb 的路径结构一致（cnb 规范路径带 `/-/`，且同样支持 `latest/download`）。
+- `repos` 存 release 根路径（以 `/releases` 结尾）。附件地址由 `RepoConfig.get_resource_asset_urls(repo_key, tag, file_name)` 拼装：`tag` 非空时为 `{root}/download/{tag}/{file}`，为空时为 `{root}/latest/download/{file}`。新增非 GitHub 源时注意各平台的路径结构差异（CNB 规范路径带 `/-/`）。
 - 某个仓库缺少某个源时，候选回退会自动跳过该源。
 - 该段整体可选；未配置的项目回退到各构造点自带的下载地址。
 
@@ -53,7 +49,7 @@ resource_download:
 候选顺序由 `RepoConfig.get_resource_source_candidates()` 生成：
 
 ```text
-用户指定源 → 上次成功源 → 按语言推荐源（zh→cnb en→github）→ 其余源按 YAML 顺序
+用户指定源 → 上次成功源 → 按语言推荐源（本分支 zh/en 都是 github）→ 其余源按 YAML 顺序
 ```
 
 `EnvConfig.get_resource_source_order()` 封装了以上入参（当前语言来自 `i18_utils`）。

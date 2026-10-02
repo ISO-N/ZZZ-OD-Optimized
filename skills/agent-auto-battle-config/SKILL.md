@@ -2,7 +2,7 @@
 name: agent-auto-battle-config
 description: OneDragon ZZZ 脚本速成指南 - 自动战斗 YAML 配置的完整语法与设计模式
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, auto-battle, yaml, script, automation]
 ---
 

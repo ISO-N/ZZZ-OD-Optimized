@@ -4,7 +4,7 @@
 
 ## 1. 测试在哪 / 怎么跑
 
-- 测试代码在独立仓 [zzz-od-test](https://github.com/OneDragon-Anything/zzz-od-test);clone 到主仓根目录,IDE 里把 `zzz-od-test/` 设为 `Test Sources Root`。
+- 测试代码在上游独立仓 [zzz-od-test](https://github.com/OneDragon-Anything/zzz-od-test);clone 到主仓根目录,IDE 里把 `zzz-od-test/` 设为 `Test Sources Root`。本分支不在 CI 中运行测试仓(`test-check.yml` 已删除),只在本地运行。
 - 主仓不保留测试(`tests/` 已废弃);新测试加到 `zzz-od-test/test/` 对应被测包路径下。
 - 环境变量:把 `zzz-od-test/.env.sample` 复制到主仓根 → `.env`(部分测试需要;本地若只跑自己改的部分,可不配全)。
 - 跑测试:

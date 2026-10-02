@@ -4,7 +4,7 @@
 
 ## 文档索引
 
-- **开发环境与工具**：[快速开始](setup/quickstart.md) · [相关仓库](setup/repositories.md) · [AI 编码助手接入](setup/ai_coding.md)
+- **开发环境与工具**：[快速开始](setup/quickstart.md) · [相关仓库](setup/repositories.md) · [发布流程](setup/release.md) · [AI 编码助手接入](setup/ai_coding.md)
 - **编码规范**：[agent_guidelines.md](spec/agent_guidelines.md)
 - **开发流程**：[端到端开发流程](development_workflow.md)
 - **架构设计**：[一条龙整体架构](one_dragon/one_dragon_architecture.md) · [集成启动器 RuntimeLauncher](one_dragon/runtime_launcher.md) · [Git 服务与代码源回退](one_dragon/modules/git_service.md) · [资源下载源与候选回退](one_dragon/modules/resource_download.md) · [项目工作目录](one_dragon/modules/work_directory.md) · [模块文档](one_dragon/modules/)
@@ -30,7 +30,7 @@
 
 ### 1.3.测试
 
-由于部分测试代码需要游戏截图，防止仓库过大，测试相关代码存放在另一个仓库中，见 [zzz-od-test](https://github.com/OneDragon-Anything/zzz-od-test)
+由于部分测试代码需要游戏截图，防止仓库过大，测试相关代码存放在上游独立仓 [zzz-od-test](https://github.com/OneDragon-Anything/zzz-od-test)。本分支**未在 CI 中运行测试仓**，只在本地跑。
 
 可以将测试仓库在本项目根目录下克隆使用。请自行在IDE中设置为`Test Sources Root`。
 
@@ -68,7 +68,11 @@ uv run --env-file .env pytest zzz-od-test/
 
 ## 3.打包
 
-进入 deploy 文件夹，运行 `build_full.bat` 可一键打包所有组件。
+正式发布产物（Installer / Launcher / RuntimeLauncher / Full / Full-Environment / WithRuntime / Environment zip，共 8 个附件）由 `.github/workflows/build-release.yml` 在 push `v*` tag 时构建并上传 Release。
+
+**发布步骤、必查项（`deploy/module_manifest.py` 必须与源码同步）、首次自举、代码签名开关与发布后验收清单，见 [发布流程](setup/release.md)。**
+
+`deploy/build_full.bat` 只用于本地快速出一份调试产物（进入 `deploy` 目录执行），不带 wheels 环境包，不等于发布产物。
 
 ### 3.1.安装器
 

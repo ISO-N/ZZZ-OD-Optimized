@@ -10,12 +10,16 @@
 
 ## 项目概述
 
+- **本仓库是 [`ISO-N/ZZZ-OD-Optimized`](https://github.com/ISO-N/ZZZ-OD-Optimized)，上游 [`OneDragon-Anything/ZenlessZoneZero-OneDragon`](https://github.com/OneDragon-Anything/ZenlessZoneZero-OneDragon) 的性能优化分支，独立发布，非官方发布。**
+- 分支约定：trunk 是 `main`；上游新功能用 `git merge --no-ff upstream/main` 合入。
+- 下载源约定：只有 GitHub 一个源（`config/repository.yml`），**不要引入 CNB / Gitee / MirrorChyan**；uv / Python / OCR / YOLO 模型都直接消费上游 `OneDragon-Env`、`OneDragon-YOLO` 的 GitHub Release。
+- 发布约定：推 `v*` tag 由 `.github/workflows/build-release.yml` 产出 8 个附件；本分支**不在 CI 里跑测试**（`test-check.yml` 已删除）。发布步骤与两个必查坑见 [发布流程](docs/develop/setup/release.md)——**改了 `src/` 的第三方导入后，必须重新生成并提交 `deploy/module_manifest.py`**，否则 WithRuntime 包会拒绝同步代码。
 - 项目：绝区零一条龙（ZenlessZoneZero-OneDragon），面向 Windows 的绝区零自动化工具。
 - 语言与环境：Python 3.11、uv、PySide6。
 - 代码布局：`src-layout`，源码在 `src/`，运行时配置在 `config/`，资源在 `assets/`，开发文档在 `docs/develop/`。
 - 运行基准：1080p；配置以 YAML 为主。
-- 所有测试统一在独立仓 `zzz-od-test/test/`(`.gitignore`,须 clone 到仓库根目录才能读/改;clone 见 [quickstart §②](docs/develop/setup/quickstart.md),测试规范见 [testing/](docs/develop/testing/README.md))。主仓不保留测试。AI 查测试用 `Read`/`grep` 显式指定 `zzz-od-test/`(默认搜索会跳过 .gitignore)。
-- 相关仓库全貌(测试仓 / yolo 训练仓 / 数据集 / 官网 blog)见 [相关仓库](docs/develop/setup/repositories.md);外部贡献者需 fork 后开发。
+- 所有测试统一在上游独立仓 `zzz-od-test/test/`(`.gitignore`,须 clone 到仓库根目录才能读/改;clone 见 [quickstart §②](docs/develop/setup/quickstart.md),测试规范见 [testing/](docs/develop/testing/README.md))。本仓不保留测试。AI 查测试用 `Read`/`grep` 显式指定 `zzz-od-test/`(默认搜索会跳过 .gitignore)。
+- 相关仓库全貌(环境与模型仓 / 测试仓 / yolo 训练仓 / 数据集)见 [相关仓库](docs/develop/setup/repositories.md)。
 
 ## 常用命令
 
@@ -66,7 +70,7 @@ uv run --env-file .env ruff check --fix src/你修改的文件.py
 1. **画面建档**(涉及新画面时):按 `zzz-od-dev-screen-onboarding` skill 截图 / 分析 / 建模 / 留档。功能知识按**四文档分工**(gameplay 玩法 / mechanics 通用机制 / screen 画面 / develop application 自动化,见 [doc_organization.md](docs/develop/harness/doc_organization.md))。
 2. **开发**:做成 `Application`(`ApplicationFactory` 接入)+ `Operation`,复用现有配置 / 界面模式(架构细则见上方「功能开发优先路径」)。
 3. **测试**:用留档截图在测试仓补流程测试(见 [testing/](docs/develop/testing/))。
-4. **提 PR**:assign **DoctorReid / ShadowLemoon**,按 `zzz-od-dev-pr-finishing` skill 走 review / resolve。
+4. **提 PR**:上游流程是 assign **DoctorReid / ShadowLemoon**;本分支没有该权限,只开本仓 PR 自审,需要合上游时按 `zzz-od-dev-pr-finishing` skill 走上游流程。
 5. **配套(按需)**:模型 → [yolo/dataset 仓](docs/develop/setup/repositories.md);使用说明 → blog(**用户可见变化**才更新)。
 
 ## 开发硬约束
@@ -91,6 +95,9 @@ uv run --env-file .env ruff check --fix src/你修改的文件.py
 - 复杂功能、架构调整或新自动化流程，先补设计/说明文档，再继续实现。
 
 ## 提交流程与协作边界
+
+> 本节下面的「两仓协同」「assign DoctorReid / ShadowLemoon」「测试仓先合」等规则是**上游流程**，本分支不适用（本仓无测试仓 CI、无上游 reviewer 权限）。本分支实际流程：改动直推 `main` 或开本仓 PR 自审；测试改动只在本地跑。
+> commit / PR 规范仍然适用。
 
 - 默认不要主动执行 `git commit`、`git push`、`git reset`、删分支等版本控制操作，除非用户明确要求。
 - 测试改动在独立仓 `zzz-od-test` 提交:主仓 `git add zzz-od-test/...` 会被 `.gitignore` **静默跳过**(不报错但未加入)→ 须 `git -C zzz-od-test add test/ && git -C zzz-od-test commit` 单独提交,否则 PR 丢测试。

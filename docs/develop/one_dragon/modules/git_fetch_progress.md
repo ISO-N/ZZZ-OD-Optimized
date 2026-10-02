@@ -327,12 +327,14 @@ pygit2 回调不能直接跨 C 边界抛出异常。其处理方式是：
 
 libgit2 的回调结构虽然存在 `completion` 字段，但 1.9.1 头文件明确标记为“currently unused”，pygit2 1.19.0 也没有把它绑定到 Python 回调。
 
-## CNB depth=1 实测
+## depth=1 实测
+
+> 本节及下文提到的「CNB 实测」是历史采样记录：当时的代码源里有 CNB 镜像。本分支已移除 CNB / Gitee 源，只保留 GitHub，所以复现时请用下面的 GitHub 地址。这些结论描述的是 libgit2 / pygit2 的回调行为，与具体托管平台无关。
 
 测试地址：
 
 ```text
-https://cnb.cool/OneDragon-Anything/ZenlessZoneZero-OneDragon
+https://github.com/ISO-N/ZZZ-OD-Optimized
 ```
 
 测试条件：

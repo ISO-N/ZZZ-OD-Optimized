@@ -2,7 +2,7 @@
 name: zzz-od-dev-character
 description: 绝区零一条龙新增可自动战斗角色指南，覆盖 Agent 定义、头像模板、状态模板与自动战斗配置
 version: 1.1.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, agent, character, auto-battle, development]
 ---
 

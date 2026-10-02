@@ -2,7 +2,7 @@
 name: new-config
 description: 新建配置工具 - 创建新的 agent state 模板、自动战斗 YAML 配置等，并运行构建脚本合并产物
 version: 1.0.0
-author: OneDragon-Anything
+author: ISO-N
 tags: [zzz, config, template, automation, powershell]
 ---
 

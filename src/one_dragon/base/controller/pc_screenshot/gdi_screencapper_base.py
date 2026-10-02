@@ -1,4 +1,5 @@
 import ctypes
+import sys
 import threading
 from dataclasses import dataclass
 
@@ -10,6 +11,14 @@ from one_dragon.base.controller.pc_game_window import PcGameWindow
 from one_dragon.base.controller.pc_screenshot.screencapper_base import ScreencapperBase
 from one_dragon.base.geometry.rectangle import Rect
 from one_dragon.utils.log_utils import log
+
+# 复用 RGB 输出缓冲时，判定「除缓冲池外无人持有」的引用计数阈值。
+# 组成：池 list 里的那一份 + 调用处的局部变量 + sys.getrefcount 的临时入参。
+_POOL_ONLY_REFCOUNT = 3
+
+# 缓冲池最多保留几张。池满且都被外部持有时，退回按帧新分配（即改动前的行为），
+# 这样既不会无界增长，也不会覆盖别人正在读的帧。
+_MAX_RGB_BUFFERS = 3
 
 
 @dataclass
@@ -38,6 +47,85 @@ class GdiScreencapperBase(ScreencapperBase):
         ScreencapperBase.__init__(self, game_win, standard_width, standard_height)
         self.ctx = GdiCaptureContext(hwnd=0, width=0, height=0)
         self._lock = threading.RLock()
+        self._rgb_buffer_pool: list[MatLike] = []
+
+    def _acquire_rgb_buffer(self, height: int, width: int) -> MatLike:
+        """取一个可以安全写入的 RGB 输出缓冲。
+
+        BGRA2RGB 每帧都会新分配一张 1080p 图（5.93MB）。这里改成优先复用一个
+        「除缓冲池外无人持有」的缓冲，从而省掉每帧的分配与首次触页开销。
+
+        安全性来自引用计数：调用方只要还持有这一帧（或它的视图——视图会持有 base），
+        该数组的引用计数就一定大于「只有池持有」的值，于是我们跳过它、改用别的缓冲
+        或直接新分配。因而**绝不会覆盖别人正在读的帧**。
+
+        Args:
+            height: 需要的高度
+            width: 需要的宽度
+
+        Returns:
+            可直接作为 cv2.cvtColor 的 dst 写入的数组
+        """
+        for buf in self._rgb_buffer_pool:
+            if (buf.shape[0] == height and buf.shape[1] == width
+                    and sys.getrefcount(buf) <= _POOL_ONLY_REFCOUNT):
+                return buf
+
+        buf = np.empty((height, width, 3), dtype=np.uint8)
+        if len(self._rgb_buffer_pool) < _MAX_RGB_BUFFERS:
+            self._rgb_buffer_pool.append(buf)
+        return buf
+
+    def _capture_and_convert_bitmap(self, ctx: GdiCaptureContext) -> MatLike | None:
+        """执行截图并转换为数组
+
+        Args:
+            ctx: 截图上下文
+
+        Returns:
+            截图数组，失败返回 None
+        """
+        if not all(
+            [
+                ctx.hwndDC,
+                ctx.mfcDC,
+                ctx.saveBitMap,
+                ctx.buffer,
+                ctx.bmpinfo_buffer,
+            ]
+        ):
+            return None
+
+        prev_obj = None
+        try:
+            prev_obj = ctypes.windll.gdi32.SelectObject(ctx.mfcDC, ctx.saveBitMap)
+
+            # 调用具体的截图方法（由子类实现）
+            if not self._do_capture(ctx):
+                return None
+
+            # 直接从 DIBSection 内存构建 numpy 数组
+            size = ctx.width * ctx.height * 4
+            array_type = ctypes.c_ubyte * size
+            buffer_array = ctypes.cast(ctx.buffer, ctypes.POINTER(array_type)).contents
+
+            img_array = np.frombuffer(buffer_array, dtype=np.uint8).reshape((ctx.height, ctx.width, 4))
+            screenshot = cv2.cvtColor(
+                img_array,
+                cv2.COLOR_BGRA2RGB,
+                dst=self._acquire_rgb_buffer(ctx.height, ctx.width),
+            )
+
+            return screenshot
+        except Exception:
+            log.debug("从位图构建截图失败", exc_info=True)
+            return None
+        finally:
+            try:
+                if prev_obj is not None:
+                    ctypes.windll.gdi32.SelectObject(ctx.mfcDC, prev_obj)
+            except Exception:
+                log.debug("恢复原始 DC 对象失败", exc_info=True)
 
     def init(self) -> bool:
         """初始化 GDI 截图方法，预加载资源
@@ -261,53 +349,6 @@ class GdiScreencapperBase(ScreencapperBase):
             )
 
         return saveBitMap, pBits, bmpinfo_buffer
-
-    def _capture_and_convert_bitmap(self, ctx: GdiCaptureContext) -> MatLike | None:
-        """执行截图并转换为数组
-
-        Args:
-            ctx: 截图上下文
-
-        Returns:
-            截图数组，失败返回 None
-        """
-        if not all(
-            [
-                ctx.hwndDC,
-                ctx.mfcDC,
-                ctx.saveBitMap,
-                ctx.buffer,
-                ctx.bmpinfo_buffer,
-            ]
-        ):
-            return None
-
-        prev_obj = None
-        try:
-            prev_obj = ctypes.windll.gdi32.SelectObject(ctx.mfcDC, ctx.saveBitMap)
-
-            # 调用具体的截图方法（由子类实现）
-            if not self._do_capture(ctx):
-                return None
-
-            # 直接从 DIBSection 内存构建 numpy 数组
-            size = ctx.width * ctx.height * 4
-            array_type = ctypes.c_ubyte * size
-            buffer_array = ctypes.cast(ctx.buffer, ctypes.POINTER(array_type)).contents
-
-            img_array = np.frombuffer(buffer_array, dtype=np.uint8).reshape((ctx.height, ctx.width, 4))
-            screenshot = cv2.cvtColor(img_array, cv2.COLOR_BGRA2RGB)
-
-            return screenshot
-        except Exception:
-            log.debug("从位图构建截图失败", exc_info=True)
-            return None
-        finally:
-            try:
-                if prev_obj is not None:
-                    ctypes.windll.gdi32.SelectObject(ctx.mfcDC, prev_obj)
-            except Exception:
-                log.debug("恢复原始 DC 对象失败", exc_info=True)
 
     def capture(self, rect: Rect, independent: bool = False) -> MatLike | None:
         """获取全屏截图并裁剪到窗口区域

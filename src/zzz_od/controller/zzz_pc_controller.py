@@ -58,11 +58,15 @@ class ZPcController(PcControllerBase):
         """
         rect = ScreenNormalWorldEnum.UID.value.rect
 
+        # new_image=False：就地涂黑，不再整图 copy。
+        # UID 区域只占整图约 0.1%，但 copy 一份 1080p RGB 要 1.39ms / 5.93MB，
+        # 战斗时 50Hz 就是 70ms/秒。screen 由 get_screenshot() 每帧新分配、
+        # 本调用链独占，就地修改不会影响别的持有者。
         return cv2_utils.mark_area_as_color(
             screen,
             pos=[rect.x1, rect.y1, rect.width, rect.height],
             color=game_const.YOLO_DEFAULT_COLOR,
-            new_image=True
+            new_image=False
         )
 
     def enable_keyboard(self):

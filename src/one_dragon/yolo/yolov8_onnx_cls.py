@@ -40,11 +40,11 @@ class RunContext:
 class ClassificationResult:
 
     def __init__(self,
-                 raw_image: MatLike,
+                 raw_image: Optional[MatLike],
                  class_idx: int,
                  run_time: Optional[float] = None,):
         self.run_time: float = time.time() if run_time is None else run_time  # 识别时间
-        self.raw_image: MatLike = raw_image  # 识别的原始图片
+        self.raw_image: Optional[MatLike] = raw_image  # 识别的原始图片 历史记录里为 None
         self.class_idx: int = class_idx  # 分类的下标 -1代表无法识别（不满足阈值）
 
 
@@ -148,9 +148,19 @@ class Yolov8Classifier(OnnxModelLoader):
         :param result: 识别结果
         :return: 组合结果
         """
-        self.run_result_history.append(result)
+        # 历史里只存分类结果与时间，不再持有整张截图（同 Yolov8Detector.record_result）。
+        self.run_result_history.append(
+            ClassificationResult(
+                raw_image=None,
+                class_idx=result.class_idx,
+                run_time=context.run_time,
+            )
+        )
+        # 过滤条件用 `<=`：保留「距今不超过 keep_result_seconds」的结果。
+        # 旧实现写的是 `>`，方向反了——它保留的是**过期**结果、丢掉刚写入的那条，
+        # 实测连跑 50 帧后历史长度恒为 0。检测版（yolov8_onnx_det）用的就是 `<=`。
         self.run_result_history = [i for i in self.run_result_history
-                                   if context.run_time - i.run_time > self.keep_result_seconds]
+                                   if context.run_time - i.run_time <= self.keep_result_seconds]
 
     @property
     def last_run_result(self) -> Optional[ClassificationResult]:

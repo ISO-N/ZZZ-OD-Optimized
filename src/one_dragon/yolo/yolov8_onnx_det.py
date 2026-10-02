@@ -204,7 +204,13 @@ class Yolov8Detector(OnnxModelLoader):
             results=results,
             run_time=context.run_time
         )
-        self.run_result_history.append(new_frame)
+        # 历史里只存识别结果与时间，不再持有整张截图：
+        # 50Hz × keep_result_seconds=2 会保留约 100 帧，每帧钉住一张 1080p 图
+        # （约 5.93MB）就是约 593MB 常驻内存。消费方（如 lost_void_detector）
+        # 只读 .results / .run_time，draw_detections 用的是 run() 返回的那一帧。
+        self.run_result_history.append(
+            DetectFrameResult(raw_image=None, results=results, run_time=context.run_time)
+        )
         self.run_result_history = [i for i in self.run_result_history
                                    if context.run_time - i.run_time <= self.keep_result_seconds]
 

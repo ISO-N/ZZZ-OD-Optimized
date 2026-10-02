@@ -33,8 +33,13 @@ def scale_input_image_u(image: MatLike, onnx_input_width: int, onnx_input_height
         input_img = image
 
     # 缩放后最后的处理
-    input_img = input_img / 255.0
-    input_img = input_img.transpose(2, 0, 1)
-    input_tensor = input_img[np.newaxis, :, :, :].astype(np.float32)
+    # 先转置再 astype(float32)，最后在新数组上原地归一化。
+    # 原来的 `input_img / 255.0` 会让 numpy 先分配一份 float64 中间体
+    # （640x640x3 时约 9.8MB）再做一次 float32 拷贝；这里只保留必要的一次拷贝，
+    # 且原地乘不会碰到调用方传入的 image（astype 一定返回新数组）。
+    # 数值与旧实现一致，见 .dsh/performance-benchmark/verify/v02_yolo_preprocess.py。
+    input_img = input_img.transpose(2, 0, 1).astype(np.float32)
+    input_img *= np.float32(1.0 / 255.0)
+    input_tensor = np.ascontiguousarray(input_img)[np.newaxis, :, :, :]
 
     return input_tensor, scale_height, scale_width

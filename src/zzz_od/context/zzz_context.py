@@ -22,11 +22,19 @@ class ZContext(OneDragonContext):
         OneDragonContext.__init__(self)
         self._ocr_v6_downloading: bool = False  # 后台下载 V6 是否进行中 防止重复启动
 
-        # 后续所有用到自动战斗的 都统一设置到这个里面
-        from zzz_od.auto_battle.auto_battle_context import AutoBattleContext
-        self.auto_battle_context: AutoBattleContext = AutoBattleContext(self)
-
     #------------------- 需要懒加载的都使用 @cached_property -------------------#
+
+    @cached_property
+    def auto_battle_context(self):
+        """自动战斗上下文。
+
+        必须懒加载：它的 import 链会拉起 scipy + sklearn + onnxruntime
+        （实测三合一约 1432ms，占 ZContext 构造耗时的 95%），
+        而这些库只有在真正用到自动战斗/音量闪避时才需要。
+        原来在 __init__ 里直接构造，等于「打开 GUI」就要多等 1 秒多。
+        """
+        from zzz_od.auto_battle.auto_battle_context import AutoBattleContext
+        return AutoBattleContext(self)
 
     #------------------- 以下是 游戏/脚本级别的 -------------------#
 

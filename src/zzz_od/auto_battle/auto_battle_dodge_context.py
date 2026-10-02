@@ -7,12 +7,14 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from enum import Enum
 from typing import TYPE_CHECKING
 
-import librosa
 import numpy as np
 from cv2.typing import MatLike
-from scipy.signal import butter, correlate, filtfilt
-from sklearn.preprocessing import scale
 
+# 注意：librosa / scipy / sklearn 三个重库都是**方法内按需 import**，不在模块顶层。
+# 原因：ZContext() 构造会拉起 AutoBattleContext → AutoBattleDodgeContext，
+# 顶层 import 这三个库会把 scipy(1116ms) + sklearn(1272ms) 一起拖进「打开 GUI」的路径
+# （实测三合一 1432ms，占 ZContext 构造的 95%）。它们的实际使用点都只在
+# 「声音闪避」和「音效模板匹配」这些按需功能里，不影响启动。
 from one_dragon.base.conditional_operation.state_recorder import StateRecord
 from one_dragon.base.operation.context_notify_event import ContextNotifyEvent
 from one_dragon.utils import cal_utils, os_utils, thread_utils, yolo_config_utils
@@ -48,7 +50,9 @@ class AudioRecorder:
         self._filter_degree = 4  # 四阶bathworth多项式, 越大阻带区域滤波程度越大
         self._cut_off = 1000  # Hz,截止频率,对该频率一下的声音进行滤波,若需要识别人声可适当降低
 
-        # Butterworth高通滤波
+        # Butterworth高通滤波（scipy 按需 import，见文件顶部说明）
+        from scipy.signal import butter
+
         self.filter_b, self.filter_a = butter(
             self._filter_degree,
             self._cut_off,
@@ -93,6 +97,8 @@ class AudioRecorder:
                 while self.running:
                     stream_data = audio_recorder.record(numframes=self._chunk_size)
                     if self._used_channel > 1:
+                        import librosa  # 按需 import，见文件顶部说明
+
                         stream_data = librosa.to_mono(stream_data.T)
                     else:
                         stream_data = stream_data.T
@@ -214,6 +220,8 @@ class AutoBattleDodgeContext:
         if self._audio_template is not None:
             return
         log.info('加载声音模板中')
+        import librosa  # 按需 import，见文件顶部说明
+
         self._audio_template, _ = librosa.load(os.path.join(
             os_utils.get_path_under_work_dir('assets', 'template', 'dodge_audio'),
             'template_1.wav'
@@ -308,7 +316,10 @@ class AutoBattleDodgeContext:
         """
         y = self._get_filter_wave(y)  # 滤波
 
-        # 标准化
+        # 标准化（sklearn / scipy 按需 import，见文件顶部说明）
+        from scipy.signal import correlate
+        from sklearn.preprocessing import scale
+
         wx = scale(x, with_mean=False)
         wy = scale(y, with_mean=False)
 
@@ -328,6 +339,8 @@ class AutoBattleDodgeContext:
         :param x: 音频信号x
         :return: 滤波后波形
         """
+        from scipy.signal import filtfilt  # 按需 import，见文件顶部说明
+
         wx = filtfilt(self._audio_recorder.filter_b,
                       self._audio_recorder.filter_a,
                       x)

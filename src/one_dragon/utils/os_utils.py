@@ -77,6 +77,21 @@ def set_work_dir(work_dir: str | Path | None) -> None:
     """
     global _work_dir
     _work_dir = None if work_dir is None else Path(work_dir).resolve()
+    # 显式设置会改变 get_work_dir() 的结果，推导缓存必须一起失效
+    _derive_work_dir.cache_clear()
+
+
+@lru_cache(maxsize=1)
+def _derive_work_dir() -> str:
+    """在没有任何显式设置时推导工作目录。
+
+    结果缓存：`Path(__file__).resolve()` 单次约 0.21ms，
+    而模板扫描、配置读取这类循环里会反复调到它。
+    显式调用 set_work_dir() 时会清掉这份缓存。
+    """
+    if run_in_exe():
+        return str(Path(sys.executable).resolve().parent)
+    return str(Path(__file__).resolve().parents[3])
 
 
 def get_work_dir() -> str:
@@ -90,9 +105,7 @@ def get_work_dir() -> str:
     """
     if _work_dir is not None:
         return str(_work_dir)
-    if run_in_exe():
-        return str(Path(sys.executable).resolve().parent)
-    return str(Path(__file__).resolve().parents[3])
+    return _derive_work_dir()
 
 
 def get_env(key: str) -> str | None:
